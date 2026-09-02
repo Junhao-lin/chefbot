@@ -31,10 +31,10 @@
   - [x] 實作 4-channel RGBT 解壓縮與 RGB / Thermal 分離發布
   - [x] 整合 Method 3 熱梯度等溫線 HUD 與即時鍋具 Masking 於 `/camera/dashboard`
   - [x] 支援 ROS2 即時檢視 (`rqt_image_view`) 與離線生成成果影片 (`data/rgbt_mask_dashboard.mp4`)
-- [ ] **階段六：深度技術討論題、完整報告與成果交付 (任務 4 & 討論題)**
-  - [ ] 深入論述機器人料理關鍵 Perception 資訊與系統架構設計
-  - [ ] 闡述感知模型於閉迴路控制 (Closed-loop Execution) 的實機落地
-  - [ ] 評析 Sim-to-Real / RL / CV 三大領域精選前沿論文
+- [x] **階段六：深度技術討論題、完整報告與成果交付 (任務 4 & 討論題)**
+  - [x] 深入論述機器人料理關鍵 Perception 資訊與系統架構設計
+  - [x] 闡述感知模型於閉迴路控制 (Closed-loop Execution) 的實機落地
+  - [x] 評析 Sim-to-Real / RL / CV 三大領域精選前沿論文
 
 
 

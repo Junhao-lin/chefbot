@@ -26,7 +26,12 @@
   - [x] 實作空間幾何門控與 Arrhenius 不可逆熱量累積積分模型 (Zero Hardcoded Timestamps)
   - [x] 繪製全時序出版級雙 Y 軸狀態機分析曲線圖 (`data/cooking_fsm_doneness_timeline.png`)
   - [x] 實作深度學習 YOLO-Seg + 傳統幾何圓融合之 Realtime 鍋具 Masking (`/wok/mask`)
-- [ ] **階段五：深度技術討論題、完整報告與成果交付 (任務 4 & 討論題)**
+- [x] **階段五：生成綜合多模態 4-in-1 Dashboard 展示影片 (任務 1)**
+  - [x] 建立 ROS2 Package (`rgbt_cooking_perception`) 與節點架構
+  - [x] 實作 4-channel RGBT 解壓縮與 RGB / Thermal 分離發布
+  - [x] 整合 Method 3 熱梯度等溫線 HUD 與即時鍋具 Masking 於 `/camera/dashboard`
+  - [x] 支援 ROS2 即時檢視 (`rqt_image_view`) 與離線生成成果影片 (`data/rgbt_mask_dashboard.mp4`)
+- [ ] **階段六：深度技術討論題、完整報告與成果交付 (任務 4 & 討論題)**
   - [ ] 深入論述機器人料理關鍵 Perception 資訊與系統架構設計
   - [ ] 闡述感知模型於閉迴路控制 (Closed-loop Execution) 的實機落地
   - [ ] 評析 Sim-to-Real / RL / CV 三大領域精選前沿論文
@@ -89,20 +94,8 @@ source ~/.bashrc
 
 ## 階段二：ROS2 Package 實作與 Thermal 多模態正規化演算法 (任務 1)
 
-### 1. ROS2 Package 架構設計 (`rgbt_cooking_perception`)
-本階段建立了專屬的 ROS2 影像處理節點，負責將 4-Channel RGBT 影像解壓縮、分離為可見光 RGB 與熱成像 Thermal，並進行即時多模態影像增強與鍋具工作空間遮罩發佈：
 
-* **節點名稱**：`rgbt_stream_processor`
-* **訂閱 Topic**：`/camera/rgbt/compressed` (`sensor_msgs/msg/CompressedImage`)
-* **發布 Topics**：
-  * `/camera/rgb/image_raw` (`sensor_msgs/msg/Image`) - 原始可見光串流
-  * `/camera/thermal/enhanced` (`sensor_msgs/msg/Image`) - 時間一致性增強熱成像
-  * `/camera/rgbt/fusion` (`sensor_msgs/msg/Image`) - 多模態 HUD 疊合串流
-  * `/wok/mask` (`sensor_msgs/msg/Image`) - 鍋具受熱面幾何遮罩
-
----
-
-### 2. Thermal 6 種正規化與多模態融合演算法評測
+### 1. Thermal 6 種正規化與多模態融合演算法評測
 
 熱成像感測器在料理過程中記錄的是紅外輻射能量。為了精確捕捉**鍋底升溫預熱、熱油流動、蛋液吸熱相變與翻面熟化**，我實作並評測了 **6 種 Thermal 正規化與多模態融合方法**：
 
@@ -110,14 +103,14 @@ source ~/.bashrc
 | :---: | :--- | :--- | :--- | :--- |
 | **1** | **Wok-Only Masked Fusion<br>(空間局部遮罩融合)** | 限制只在黑鐵鍋受熱面內部疊加 Inferno 熱力圖，背景不銹鋼流理台維持 100% 純淨 RGB。 | 徹底消除流理台的金屬反光雜色，背景純淨。 | 鍋底高溫區容易過曝，細微溫差仍有遮蔽。 |
 | **2** | **Calibrated Turbo Range<br>(物理溫差量程校準)** | 將量程動態鎖定在蛋白質變性關鍵物理區間 $[60^\circ\text{C}, 210^\circ\text{C}]$（數值 130~215），採用 Turbo Colormap。 | 呈現冷藍（生蛋）$\to$ 暖綠 $\to$ 亮黃 $\to$ 鮮紅（高溫鍋底）的豐富色彩層次。 | 全域顏色覆蓋仍會些微改變蛋白的原始 RGB 自然紋理。 |
-| **3** | **Thermal Gradient Edge HUD<br>(熱梯度等溫線邊界注入) 🏆** | 利用 Sobel 一階微分提取熱通量梯度（$\nabla T$ / 等溫線），將溫差突變輪廓像抬頭顯示器 (HUD) 般以亮線注入 RGB。 | **【最佳選用 🌟】**<br>1. **鍋子與蛋的熱反差對比最明顯**：生蛋入鍋的吸熱降溫冷斑與高溫鍋底交界一目了然。<br>2. **不破壞 RGB 自然色彩**：完全保留蛋白白化紋理。 | 需注意高頻噪訊濾波（已加入 Gaussian Blur 平滑）。 |
+| **3** | **Thermal Gradient Edge HUD<br>(熱梯度等溫線邊界注入) [最佳選用]** | 利用 Sobel 一階微分提取熱通量梯度（$\nabla T$ / 等溫線），將溫差突變輪廓像抬頭顯示器 (HUD) 般以亮線注入 RGB。 | **【最佳選用】**<br>1. **鍋子與蛋的熱反差對比最明顯**：生蛋入鍋的吸熱降溫冷斑與高溫鍋底交界一目了然。<br>2. **不破壞 RGB 自然色彩**：完全保留蛋白白化紋理。 | 需注意高頻噪訊濾波（已加入 Gaussian Blur 平滑）。 |
 | **4** | **Guided Filter Edge-Preserving<br>(引導濾波邊緣保真融合)** | 利用 RGB 高頻邊緣引導 Thermal 圖像平滑濾波，消除熱成像的像素毛邊。 | 邊緣過渡自然平滑，熱斑貼合物體外觀。 | 計算量稍大，在雙鏡頭近距離視差 (Parallax) 處偶有光暈。 |
 | **5** | **Adaptive CLAHE + Magma<br>(自適應局部對比增強)** | 套用限制對比度自適應直方圖均衡化 (CLAHE)，局部拉伸熱反差。 | 大幅放大低溫區域的細微溫差。 | 在時序上會引起輕微的幀間亮度抖動 (Flickering)。 |
 | **6** | **Baseline Fixed Range<br>(全域固定量程基準對照)** | 傳統固定量程 $[0, 255]$ 直接轉換為 Inferno 偽彩色並與 RGB 做加權疊合。 | 實現最簡單，絕對時間一致性最高。 | 高溫鍋底呈現一片死白/平坦過曝，喪失熱梯度細節。 |
 
 ---
 
-### 3. 為什麼最終選擇「第 3 種方法 (Thermal Gradient Edge HUD)」？
+### 2. 為什麼最終選擇「第 3 種方法 (Thermal Gradient Edge HUD)」？
 
 1. **鍋子與蛋的熱反差對比最為強烈、最直觀**：
    * 雞蛋富含水分，打入 $200^\circ\text{C}$ 熱鍋時會瞬間產生劇烈吸熱降溫（$\Delta T \le 80^\circ\text{C}$）。
@@ -128,7 +121,7 @@ source ~/.bashrc
 
 ---
 
-### 4. 執行 6 種方法 2x3 六分割對照影片生成
+### 3. 執行 6 種方法 2x3 六分割對照影片生成
 
 在已下載 Bag 檔案的環境下，執行以下腳本即可**一次同步生成兩部高畫質 2x3 六分割對比展示影片**：
 
@@ -290,5 +283,77 @@ python3 scripts/fsm/plot_fsm_timeline.py --output data/cooking_fsm_doneness_time
 ```bash
 python3 scripts/wok/generate_wok_mask_fusion.py --output data/wok_mask_fusion_demo.mp4
 ```
+
+---
+## 階段五：生成綜合多模態 4-in-1 Dashboard 展示影片 (任務 1)
+
+### 1. 多模態融合監控面板設計理念 (Multi-modal Dashboard Architecture)
+
+在機器人自主料理系統中，單一感測模態往往存在感知盲區：
+* 可見光 RGB 能清晰辨識蛋體外觀形態與邊界，但無法感知鍋底是否達到預熱溫度，亦無法捕捉隱藏在油煙下的劇烈吸熱相變；
+* 熱成像 Thermal 能精確測量紅外輻射熱量，但缺乏細節紋理與邊界語意；
+* 幾何遮罩 `/wok/mask` 則提供了機械臂操作的剛性邊界防護。
+
+為了讓工程人員、監控節點與上位決策系統能在**單一低延遲串流**中宏觀掌握料理全貌，我設計了 **綜合多模態 4 合 1 監控面板 (`/camera/dashboard`)**：
+
+| 面板位置 | 主題名稱 (ROS2 Topic) | 技術原理與視覺化設計 | 料理控制決策用途 |
+| :--- | :--- | :--- | :--- |
+| **面板 1 (左上)** | `/rgb/image_raw` | 4 通道 RGBT 解碼後還原之純淨 3 通道可見光串流。 | 監控食材幾何形態、白化程度與大廚操作動作。 |
+| **面板 2 (右上)** | `/thermal/enhanced` | **Method 3 - Thermal Gradient Edge HUD 注入影像**。<br>利用 Sobel 一階微分提取溫差熱梯度（$\nabla T$），以等溫線形式疊合於 RGB 畫面。 | 凸顯生蛋入鍋引發的吸熱降溫冷斑與高溫鍋底邊界，不破壞 RGB 自然色澤。 |
+| **面板 3 (左下)** | `/wok/mask` | **深度學習 YOLO-Seg 權重 + 傳統幾何先驗圓融合遮罩**。<br>結合形態學閉運算與時序指數平滑（EMA），以純黑底亮綠色即時輸出。 | 提供機械臂炒菜、顛鍋與鏟蛋的受熱工作空間邊界約束。 |
+| **面板 4 (右下)** | `/camera/dashboard` | **綜合多模態融合畫面**。<br>整合 RGB 背景、半透明黃色鍋具 Mask、亮黃色邊界輪廓、彩色熱梯度等溫線、以及頂部即時均溫 HUD 資訊列。 | 提供系統全局即時狀態監控（Zero-Latency 全模態一覽無遺）。 |
+
+---
+
+### 2. ROS2 Package 架構設計 (`rgbt_cooking_perception`)
+
+* **套件路徑**：`src/rgbt_cooking_perception`
+* **節點名稱**：`rgbt_stream_processor`
+* **訂閱 Topic**：`/rgbt/rgbt/compressed` (`sensor_msgs/msg/CompressedImage`)
+* **發布 Topics**：
+  * `/rgb/image_raw` 及 `/camera/rgb/image_raw` (`sensor_msgs/msg/Image`, `bgr8`) - 原始可見光串流
+  * `/thermal/enhanced` 及 `/camera/thermal/enhanced` (`sensor_msgs/msg/Image`, `bgr8`) - Method 3 熱梯度等溫線增強影像
+  * `/wok/mask` (`sensor_msgs/msg/Image`, `mono8`) - 鍋具受熱面遮罩
+  * `/camera/dashboard` (`sensor_msgs/msg/Image`, `bgr8`) - 綜合多模態 4 合 1 監控畫面
+
+---
+
+### 3. ROS2 套件編譯與多終端機啟動操作流程
+
+經實測驗證，請開啟 **3 個 WSL2 終端機視窗** 進行驗收操作：
+
+```bash
+# ----------------- [視窗 1] 編譯並啟動影像處理節點 -----------------
+source /opt/ros/humble/setup.bash
+colcon build --build-base /tmp/build --install-base /tmp/install --packages-select rgbt_cooking_perception
+source /tmp/install/setup.bash
+ros2 launch rgbt_cooking_perception stream_perception.launch.py
+
+# ----------------- [視窗 2] 循環播放 ROS2 Bag 影像串流 -----------------
+source /opt/ros/humble/setup.bash
+ros2 bag play data -l
+
+# ----------------- [視窗 3] 開啟 ROS 影像檢視器 -----------------
+# 方式 A: 快速開啟單一主題 (例如 Thermal 等溫線增強畫面)
+source /opt/ros/humble/setup.bash
+ros2 run rqt_image_view rqt_image_view /thermal/enhanced
+
+# 方式 B: 開啟 rqt 完整多面板儀表板 (可同時新增多個 Image View 並列顯示)
+rqt
+
+# (選用) 驗收 Topic 發布頻率:
+ros2 topic hz /thermal/enhanced
+```
+
+---
+
+### 4. 離線一鍵生成成果展示影片 (免 ROS 環境)
+
+若在 Windows 或純 Python 環境下進行成果展示，可直接執行以下腳本產出高畫質 2x2 成果影片：
+
+```bash
+python3 scripts/wok/generate_rgbt_mask_dashboard_video.py --output data/rgbt_mask_dashboard.mp4
+```
+* **輸出檔案**：`data/rgbt_mask_dashboard.mp4`（1080p, 20 FPS, H.264 編碼）
 
 ---

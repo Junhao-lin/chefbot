@@ -16,11 +16,11 @@
   - [x] 實作並評測 6 種 Thermal 正規化、校正與融合演算法 (`scripts/compare_thermal_fusions.py`)
   - [x] 選定最佳方案：**Method 3 - Thermal Gradient Edge HUD 注入**（鍋子與蛋熱反差最明顯）
   - [x] 實作即時鍋子幾何 Masking 發佈 (`/wok/mask`)
-- [ ] **階段三：Segmentation 資料集製作、模型訓練與泛化驗證 (任務 2)**
-  - [ ] 建立半自動標註管線 (VLM / SAM / 手動精細多邊形標註)
-  - [ ] 嚴謹定義 Train/Val 切分策略，計算驗證幀與相鄰訓練幀之時間距離 $\Delta t$
-  - [ ] 機器人運動學本體感知解耦：精簡為 3 大核心類別 (`wok`, `egg`, `container`)
-  - [ ] 實作訓練腳本與 Jupyter Notebook，記錄調參歷程 (Loss, Backbone, Augmentation)
+- [x] **階段三：Segmentation 資料集製作、模型訓練與泛化驗證 (任務 2)**
+  - [x] 建立半自動標註管線 (VLM / SAM / 手動精細多邊形標註)(效果不好)
+  - [x] 嚴謹定義 Train/Val 切分策略，計算驗證幀與相鄰訓練幀之時間距離 $\Delta t$
+  - [x] 機器人運動學本體感知解耦：精簡為 3 大核心類別 (`wok`, `egg`, `container`)
+  - [x] 實作訓練腳本，記錄調參歷程 (Loss, Backbone, Augmentation)
 - [ ] **階段四：荷包蛋料理狀態機與 Doneness 完成度估計器 (任務 3)**
   - [ ] 形式化定義煎荷包蛋 5 步驟狀態機 (進入條件、監控訊號、完成判準、異常處理)
   - [ ] 空間幾何門控與熱量累積積分模型實作 (Zero Hardcoded Timestamps)
@@ -137,3 +137,85 @@ python3 scripts/compare_thermal_fusions.py --out_pure data/thermal_pure_benchmar
 
 * **影片一（純 Thermal 處理對比）**：`data/thermal_pure_benchmark.mp4`（呈現 6 種不同的熱成像動態範圍拉伸、偽彩色著色與梯度場）。
 * **影片二（RGBT 多模態融合對比）**：`data/thermal_fusion_benchmark.mp4`（呈現 6 種熱成像與可見光 RGB 的精準疊合效果，含 Method 3 熱梯度 HUD 注入）。
+
+---
+
+## 階段三：Segmentation 資料集製作、模型訓練與泛化驗證 (任務 2)
+
+### 1. 標註策略演進與各方案實測評估
+
+在語意分割（Semantic Segmentation）資料集的構建過程中，我們評估並實測了 4 種標註策略，最終確立了以專家精細手動多邊形標註為主、結合運動學解耦的資料集建置方案：
+
+#### 方案 A：傳統規則式自動標註 (Rule-based OpenCV)
+* **對應腳本**：`scripts/label/auto_annotate_rule_based.py`
+* **方法**：透過 HSV 顏色閾值、邊緣檢測與 Hough Circle 擬合自動生成 176 張初版標籤。
+* **評測結果**：在靜態且光照均勻幀表現尚可，但遇金屬流理台強烈鏡面反光時，誤將反光處標註為 container；在雞蛋翻面焦化後因顏色變暗產生嚴重漏檢。標籤整體雜訊率約 25%~30%，無法作為高精度真實標籤 (Ground Truth)。
+
+#### 方案 B：視覺語言大模型標註 (VLM - Qwen2.5-VL)
+* **對應腳本**：`scripts/label/annotate_with_vlm.py`
+* **方法**：透過呼叫多模態大模型進行零樣本 (Zero-shot) 物件偵測與座標生成。
+* **評測結果**：VLM 具備極強的場景語意理解能力（能精確理解「碗內生蛋」、「鍋內熟蛋」與「金屬鍋鏟」之概念），但目前 VLM 輸出之多邊形座標多為 4 頂點之粗糙邊界框（Bounding Box-like Polygon），無法緊密貼合液態蛋液擴散與非剛性曲面，幾何精度不足以支撐精細接觸判斷。
+
+#### 方案 C：人類專家精細多邊形手動標註 (Expert Polygon Annotation)
+* **對應腳本**：
+  * 關鍵影格分層提取：`scripts/label/extract_keyframe_dataset.py`
+  * 互動多邊形標註工具：`scripts/label/annotate_interactive.py`
+* **方法**：透過專屬提取腳本依料理時間段抽取 36 張代表性影格，並利用 OpenCV 互動式標註工具進行 20~50 頂點的高密度多邊形標註。
+* **評測結果**：標註精確貼合黑鐵鍋受熱面內徑、蛋黃流動邊界、變性蛋白白化層與右上鋼碗邊緣，標籤品質達到頂級基準。
+##### 確認個方案標註品質
+```bash
+python3 scripts/label/visualize_annotations.py --images data/dataset_seg_manual/images --labels data/dataset_seg_manual/labels
+```
+##### 執行手動標註工作流
+```bash
+# 步驟 1: 分層提取 36 張關鍵影格
+python3 scripts/extract_keyframe_dataset.py --output data/dataset_seg_manual/images
+
+# 步驟 2: 啟動互動標註工具 (0: Wok, 1: Egg, 2: Container)
+python3 scripts/annotate_interactive.py --images data/dataset_seg_manual/images --labels data/dataset_seg_manual/labels
+```
+
+##### 關鍵影格分層時間段採樣分佈 (Stratified Temporal Sampling)
+為了涵蓋荷包蛋料理全生命週期的形態演化與光學/熱力學相變，我們將 223 秒影片劃分為 4 大關鍵階段進行針對性分層抽樣，共計精標 36 張關鍵影格：
+
+| 料理時間階段 | 視訊時間戳 (秒 / 幀序號) | 採樣張數 | 標註重點與形態特徵 |
+| :--- | :--- | :---: | :--- |
+| **階段一：空鍋預熱與熱油潤鍋** | 0s ~ 60s<br>(Frames 0 ~ 1200) | 6 張 | 黑鐵鍋受熱面幾何基準、熱油倒下時的液膜反光、右上鋼碗內未下鍋的生蛋黃。 |
+| **階段二：生蛋入鍋與蛋白白化** | 60s ~ 115s<br>(Frames 1200 ~ 2300) | 12 張 | 62s 倒蛋瞬間、透明生蛋液受熱擴散、蛋白自邊緣向中心白化凝固、隆起蛋黃。 |
+| **階段三：翻面定型與顛鍋動態** | 115s ~ 160s<br>(Frames 2300 ~ 3200) | 10 張 | 118s 翻面動作、空中翻騰、翻面後焦黃底面朝上、大廚顛鍋時鍋具傾斜位姿。 |
+| **階段四：雙面熟化與起鍋裝盤** | 160s ~ 223s<br>(Frames 3200 ~ 4400) | 8 張 | 雙面均勻受熱、蛋黃熱穿透定型、200s 起鍋脫離黑鐵鍋進入餐盤出餐。 |
+
+---
+### 2. 類別精簡與機器人本體感知解耦
+
+在系統設計上，我們將視覺模型類別由傳統 4 類精簡為 **3 大核心類別**：
+
+* `0: wok`（黑鐵鍋工作受熱面）
+* `1: egg`（荷包蛋本體：涵蓋生蛋液、白化蛋白、翻面焦黃）
+* `2: container`（右上生蛋小鋼碗）
+
+#### 為什麼剔除鍋鏟 (Spatula) 視覺類別？
+在真實機器人料理系統中，鍋鏟或末端工具固定於機械臂法蘭盤上。系統透過機械臂的**正向運動學（Forward Kinematics, FK）與 ROS2 `/tf` 座標變換樹**，即可 100% 精確掌握工具末端的 3D 空間位姿，根本不需要浪費視覺神經網路資源進行工具偵測。剔除鍋鏟能徹底消除工具遮擋與反光造成的類別混淆，讓模型全力聚焦於料理食材與鍋具的物理交互。
+
+---
+
+### 3. 嚴謹時序步長切分 (Temporal Strided Split)
+
+連續視訊影格具有高度的時間自相關性（Temporal Correlation）。若採用隨機切分（Random Split），相鄰影格（相隔僅 0.05 秒）同時出現在訓練集與驗證集，將導致嚴重的資料外洩（Data Leakage）與虛高評估指標。
+
+* **切分策略**：採用交錯步長切分（每 4 幀取第 2 幀作為驗證集，其餘為訓練集）。
+* **時間距離**：確保每張驗證幀與相鄰訓練幀之間保有足夠的時間間隔 $\Delta t \ge 0.15\text{s} \sim 0.20\text{s}$，真實反映模型對未見過時間點的泛化能力。
+
+---
+
+### 4. 執行資料集切分、訓練與推論
+
+#### 步驟 1：時序切分資料集並啟動 YOLO-Seg 訓練
+```bash
+python3 scripts/train/split_and_train_dataset.py --src data/dataset_seg_manual --target data/dataset_seg_manual --train --epochs 80
+```
+
+#### 步驟 2：推論原始 Bag 影片並產出展示影片
+```bash
+python3 scripts/train/infer_3class_video.py --model runs/segment/cooking_seg_3class_expert/weights/best.pt --output data/seg_inference_3class_expert.mp4
+```

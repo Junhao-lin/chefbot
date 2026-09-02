@@ -232,7 +232,7 @@ def generate_benchmark_videos(bag_path: Path, out_pure_video: Path, out_fusion_v
 
         if frame_idx % 300 == 0:
             percent = (frame_idx / total_msgs) * 100.0 if total_msgs > 0 else 0
-            print(f"⏳ 進度: [{frame_idx:>4}/{total_msgs}] ({percent:5.1f}%) | 耗時: {time.time()-t0:.1f}s")
+            print(f"進度: [{frame_idx:>4}/{total_msgs}] ({percent:5.1f}%) | 耗時: {time.time()-t0:.1f}s")
 
     conn.close()
     if writer_pure is not None:

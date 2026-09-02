@@ -149,7 +149,7 @@ def train_model(data_yaml: Path, model_name: str = "yolo11s-seg.pt", epochs: int
         imgsz=640,
         batch=batch_size,
         device=device,
-        project="runs/segment",
+        project="./",
         name="cooking_seg_3class_expert",
         exist_ok=True,
         verbose=True,
@@ -164,7 +164,7 @@ def train_model(data_yaml: Path, model_name: str = "yolo11s-seg.pt", epochs: int
         fliplr=0.5
     )
 
-    best_weight = Path("runs/segment/cooking_seg_3class_expert/weights/best.pt")
+    best_weight = Path(results.save_dir) / "weights" / "best.pt"
     print(f"\n================ 訓練完成！ ================")
     print(f"最佳權重路徑: {best_weight.resolve()}")
     return best_weight

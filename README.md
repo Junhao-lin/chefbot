@@ -169,10 +169,10 @@ python3 scripts/label/visualize_annotations.py --images data/dataset_seg_manual/
 ##### 執行手動標註工作流
 ```bash
 # 步驟 1: 分層提取 36 張關鍵影格
-python3 scripts/extract_keyframe_dataset.py --output data/dataset_seg_manual/images
+python3 scripts/label/extract_keyframe_dataset.py --output data/dataset_seg_manual/images
 
 # 步驟 2: 啟動互動標註工具 (0: Wok, 1: Egg, 2: Container)
-python3 scripts/annotate_interactive.py --images data/dataset_seg_manual/images --labels data/dataset_seg_manual/labels
+python3 scripts/label/annotate_interactive.py --images data/dataset_seg_manual/images --labels data/dataset_seg_manual/labels
 ```
 
 ##### 關鍵影格分層時間段採樣分佈 (Stratified Temporal Sampling)
@@ -219,3 +219,15 @@ python3 scripts/train/split_and_train_dataset.py --src data/dataset_seg_manual -
 ```bash
 python3 scripts/train/infer_3class_video.py --model runs/segment/cooking_seg_3class_expert/weights/best.pt --output data/seg_inference_3class_expert.mp4
 ```
+
+### 5. 顛鍋誤判診斷與動態資料增強策略
+
+在初期模型推論驗證中，我發現大廚進行**顛鍋（Wok Tossing / Tilting）與晃鍋**動作時，模型會產生短暫的鍋具與蛋體漏檢或誤判。
+
+#### 根本原因分析 (Root Cause Analysis)
+1. **採樣偏差 (Sampling Bias)**：初版關鍵影格採樣主要以時間均勻步長抽取，大部分影格中黑鐵鍋皆處於水平靜止狀態。
+2. **非剛體視角變化與底座露出**：顛鍋時，大廚將鍋具提起並大幅度傾斜（產生 Pitch / Roll 旋轉角），鍋底離開爐面導致瓦斯爐黑鐵底座露出，模型在未見過「傾斜鍋具與爐座背景」的情況下產生特徵混淆。
+
+#### 改進對策 (Targeted Dynamic Augmentation)
+* **補充動態時序樣本**：在翻面與顛鍋關鍵時段（約 135 秒 ~ 160 秒）專門補充採樣 3 張「鍋具傾斜、大角度位移、翻面空中翻騰」之高動態影格進行手動多邊形標註。
+---

@@ -91,6 +91,10 @@ source ~/.bashrc
   - **應用定位**：作為**離線自動標註標籤生成器**。搭配 Prompt（如鍋底高溫熱區坐標或 VLM 生成的 Bounding Box），快速產生高精度物體 Mask。
 
 ---
+## 階段一：下載與 RGBT ROS Bag 探索解碼腳本
+```bash
+python3 scripts/explore_bag.py --bag data/shennongxi_task1_day1_1.db3 --out_dir data/explored_bag_frames
+```
 
 ## 階段二：ROS2 Package 實作與 Thermal 多模態正規化演算法 (任務 1)
 

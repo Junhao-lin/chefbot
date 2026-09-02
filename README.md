@@ -21,16 +21,17 @@
   - [x] 嚴謹定義 Train/Val 切分策略，計算驗證幀與相鄰訓練幀之時間距離 $\Delta t$
   - [x] 機器人運動學本體感知解耦：精簡為 3 大核心類別 (`wok`, `egg`, `container`)
   - [x] 實作訓練腳本，記錄調參歷程 (Loss, Backbone, Augmentation)
-- [ ] **階段四：荷包蛋料理狀態機與 Doneness 完成度估計器 (任務 3)**
-  - [ ] 形式化定義煎荷包蛋 5 步驟狀態機 (進入條件、監控訊號、完成判準、異常處理)
-  - [ ] 空間幾何門控與熱量累積積分模型實作 (Zero Hardcoded Timestamps)
-  - [ ] 標定判定閾值，詳列失敗模式 (油煙、反光、下油干擾) 與補償對策
+- [x] **階段四：荷包蛋料理狀態機與 Doneness 完成度估計器 (任務 3)**
+  - [x] 形式化定義煎荷包蛋 5 步驟狀態機 (進入條件、監控訊號、完成判準、異常處理)
+  - [x] 實作空間幾何門控與 Arrhenius 不可逆熱量累積積分模型 (Zero Hardcoded Timestamps)
+  - [x] 繪製全時序出版級雙 Y 軸狀態機分析曲線圖 (`data/cooking_fsm_doneness_timeline.png`)
+  - [x] 實作深度學習 YOLO-Seg + 傳統幾何圓融合之 Realtime 鍋具 Masking (`/wok/mask`)
 - [ ] **階段五：深度技術討論題、完整報告與成果交付 (任務 4 & 討論題)**
   - [ ] 深入論述機器人料理關鍵 Perception 資訊與系統架構設計
   - [ ] 闡述感知模型於閉迴路控制 (Closed-loop Execution) 的實機落地
   - [ ] 評析 Sim-to-Real / RL / CV 三大領域精選前沿論文
 
----
+
 
 ## 🛠️ 環境配置指南 (Environment Setup)
 
@@ -103,7 +104,7 @@ source ~/.bashrc
 
 ### 2. Thermal 6 種正規化與多模態融合演算法評測
 
-熱成像感測器在料理過程中記錄的是紅外輻射能量。為了精確捕捉**鍋底升溫預熱、熱油流動、蛋液吸熱相變與翻面熟化**，我們實作並評測了 **6 種 Thermal 正規化與多模態融合方法**：
+熱成像感測器在料理過程中記錄的是紅外輻射能量。為了精確捕捉**鍋底升溫預熱、熱油流動、蛋液吸熱相變與翻面熟化**，我實作並評測了 **6 種 Thermal 正規化與多模態融合方法**：
 
 | 編號 | 方法名稱 (Method) | 演算法原理 | 優點 | 局限性 / 缺點 |
 | :---: | :--- | :--- | :--- | :--- |
@@ -144,7 +145,7 @@ python3 scripts/compare_thermal_fusions.py --out_pure data/thermal_pure_benchmar
 
 ### 1. 標註策略演進與各方案實測評估
 
-在語意分割（Semantic Segmentation）資料集的構建過程中，我們評估並實測了 4 種標註策略，最終確立了以專家精細手動多邊形標註為主、結合運動學解耦的資料集建置方案：
+在語意分割（Semantic Segmentation）資料集的構建過程中，我評估並實測了 4 種標註策略，最終確立了以專家精細手動多邊形標註為主、結合運動學解耦的資料集建置方案：
 
 #### 方案 A：傳統規則式自動標註 (Rule-based OpenCV)
 * **對應腳本**：`scripts/label/auto_annotate_rule_based.py`
@@ -176,7 +177,7 @@ python3 scripts/label/annotate_interactive.py --images data/dataset_seg_manual/i
 ```
 
 ##### 關鍵影格分層時間段採樣分佈 (Stratified Temporal Sampling)
-為了涵蓋荷包蛋料理全生命週期的形態演化與光學/熱力學相變，我們將 223 秒影片劃分為 4 大關鍵階段進行針對性分層抽樣，共計精標 36 張關鍵影格：
+為了涵蓋荷包蛋料理全生命週期的形態演化與光學/熱力學相變，我將 223 秒影片劃分為 4 大關鍵階段進行針對性分層抽樣，共計精標 36 張關鍵影格：
 
 | 料理時間階段 | 視訊時間戳 (秒 / 幀序號) | 採樣張數 | 標註重點與形態特徵 |
 | :--- | :--- | :---: | :--- |
@@ -188,7 +189,7 @@ python3 scripts/label/annotate_interactive.py --images data/dataset_seg_manual/i
 ---
 ### 2. 類別精簡與機器人本體感知解耦
 
-在系統設計上，我們將視覺模型類別由傳統 4 類精簡為 **3 大核心類別**：
+在系統設計上，我將視覺模型類別由傳統 4 類精簡為 **3 大核心類別**：
 
 * `0: wok`（黑鐵鍋工作受熱面）
 * `1: egg`（荷包蛋本體：涵蓋生蛋液、白化蛋白、翻面焦黃）
@@ -230,4 +231,64 @@ python3 scripts/train/infer_3class_video.py --model runs/segment/cooking_seg_3cl
 
 #### 改進對策 (Targeted Dynamic Augmentation)
 * **補充動態時序樣本**：在翻面與顛鍋關鍵時段（約 135 秒 ~ 160 秒）專門補充採樣 3 張「鍋具傾斜、大角度位移、翻面空中翻騰」之高動態影格進行手動多邊形標註。
+---
+
+
+
+---
+
+## 階段四：荷包蛋料理狀態機與 Realtime 鍋具 Masking 融合 (任務 3)
+
+### 1. 荷包蛋料理 5 步驟形式化狀態機 (Finite State Machine, FSM)
+
+為了實現完全由多模態感知訊號驅動的自主料理閉迴路控制，我形式化定義了 5 大料理狀態：
+
+| 狀態 (State) | 進入條件 (Entry Condition) | 即時監控訊號 (Perception Signals) | 狀態完成判準 (Exit Trigger) | 失敗模式與異常防護 (Failure Modes & Recovery) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Phase 1: 預熱狀態<br>(Pre-heating)** | 機器人開火，鍋內為空 ($A_{egg} = 0$)。 | 鍋底均溫 $T_{wok}$ (透過 `/camera/thermal/enhanced`)。 | $T_{wok} \ge 160^\circ\text{C}$ (約 44s)。 | 若 $T > 230^\circ\text{C}$ 觸發乾燒警報並調降火力。 |
+| **Phase 2: 下油潤鍋<br>(Oil Seasoning)** | 鍋溫達標，機械臂注油。 | 油溫分佈、生蛋碗空間狀態、鍋底冷斑檢測。 | 生蛋落入鍋底引發劇烈吸熱冷斑 ($T_{egg} \le 135^\circ\text{C}$) 且脫離右上小鋼碗 (約 62s)。 | **下油干擾防護**：食用油比熱容小($\approx 1.7\,\text{J/g}^\circ\text{C}$)，入鍋迅速升溫不降溫；雞蛋含水率高($75\%$)，入鍋必產生冷斑，藉此物理量精確區分下油 vs 下蛋。 |
+| **Phase 3: 蛋白變性凝固<br>(Side-1 Coagulation)** | 檢測到生蛋入鍋開始受熱。 | 蛋白白化面積、蛋體平均溫度 $T_{egg}$、熱通量累積積分 $E(t)$。 | 第一面成熟度達到翻面閾值：$D(t) \ge 85\%$ (約 118s / 1分58秒)。 | **不可逆保護**：蛋白蛋白質變性不可逆，熟度嚴格滿足單調不減 $D(t) = \max(D(t), D(t-1))$，杜絕鍋鏟插入時數值暴跌。 |
+| **Phase 4: 翻面熟化<br>(Flip & Side-2)** | 機械臂執行翻面動作。 | 焦黃底面朝上之特徵、雙面接觸傳熱積分。 | 總累積成熟度達標：$D(t) \ge 100\%$ (約 200s)。 | **顛鍋晃鍋防護**：大廚晃鍋時結合運動學先驗與容器空間互斥，防止右上小碗與鍋具產生假交集。 |
+| **Phase 5: 起鍋裝盤<br>(Plating & Serve)** | 熟度達 100%，機械臂執行鏟起裝盤。 | 蛋體脫離鍋具 ($A_{egg \cap wok} \to 0$)。 | 蛋體成功轉移至餐盤，料理週期結束。 | 若起鍋超時 15 秒觸發重試機制。 |
+
+---
+
+### 2. 多模態物理動力學熱量累積積分模型 (Arrhenius Thermal Energy Model)
+
+蛋白質熱變性並非單幀靜態光學特徵，而是熱通量隨時間的累積積分：
+
+$$E(t) = \int_{t_{\text{in}}}^{t} \max(T_{\text{egg}}(\tau) - T_{\text{crit}}, 0) \cdot \mu_{\text{white}}(\tau) \, d\tau$$
+
+* $T_{\text{crit}} = 60^\circ\text{C}$：雞蛋卵白蛋白（Ovalbumin）開始熱變性的臨界溫度。
+* $\mu_{\text{white}}$：可見光 RGB 分割中蛋白區域的白化程度特徵權重。
+* **單調不減約束**：$D(t) = \max(D(t), D(t-1))$，徹底解決大廚翻面、鍋鏟遮擋與油煙干擾時成熟度劇烈抖動的工程難題。
+
+---
+
+### 3. 即時鍋具 Masking 方案：深度學習 YOLO-Seg + 傳統幾何先驗圓融合
+
+根據任務 1 要求以即時方式發佈 `/wok/mask`，實作了**混合融合架構（Hybrid Fusion & Temporal Smoothing）**：
+
+#### 演算法原理
+1. **深度學習分支 (YOLO-Seg)**：微調後的 YOLO-Seg 即時預測黑鐵鍋受熱面之精準多邊形，能完美適應大廚晃鍋、顛鍋位移與非剛體傾斜視角。
+2. **傳統幾何先驗分支 (Prior Circle)**：提供黑鐵鍋標準受熱面的幾何圓形空間基底。
+3. **形態學融合與時序 EMA 平滑**：
+   * 當 YOLO-Seg 檢測良好時，將多邊形與先驗圓進行形態學聯集與閉合平滑（`Morphology Close`），既保有動態邊界又剔除高頻噪訊。
+   * 當劇烈顛鍋或大面積工具遮擋導致檢測置信度下降時，幾何先驗圓自動平滑兜底。
+   * 透過時序指數滑動平均（$\alpha = 0.25$）濾波，輸出**極致平滑、零跳閃的即時 `/wok/mask` 遮罩**！
+
+---
+
+### 4. 執行狀態機時序圖表與鍋具 Mask 融合生成
+
+#### 步驟 1：產出全時序狀態機與 Doneness 雙軸分析圖
+```bash
+python3 scripts/fsm/plot_fsm_timeline.py --output data/cooking_fsm_doneness_timeline.png
+```
+
+#### 步驟 2：生成深度學習 + 幾何圓融合鍋具 Masking 展示影片
+```bash
+python3 scripts/wok/generate_wok_mask_fusion.py --output data/wok_mask_fusion_demo.mp4
+```
+
 ---

@@ -1,0 +1,39 @@
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# ROS2 Build & Install Artifacts
+build/
+install/
+log/
+.colcon/
+
+# Dataset & Large Bag Files (請使用者自行下載放置於 data/)
+data/
+data/*.db3
+data/*.mcap
+data/*.mp4
+data/dataset_seg/
+data/temp_sam2_frames/
+*.db3
+*.mcap
+
+# Model Weights & Training Logs
+weights/
+runs/
+*.pt
+*.onnx
+*.engine
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
